@@ -195,6 +195,8 @@ echo "=========================================================="
 echo "Pipeline Complete!"
 echo "=========================================================="
 
+<br />
+
 ### Final Output
 The final merged result file (`results/UDIPs_results/Multi-HiFiMAP_toy_chr21.txt`) will contain the exact multi-phenotype association statistics for every tested variant:
 
