@@ -44,6 +44,7 @@ python3 src/hapIBD_parsing/parsing_hapIBD.py \
     --output example/ibd_prep/chr21 \
     --n-checkpoints 20
 ```
+*chr21_toy.vcf.gz is available at : <a href="https://drive.google.com/file/d/1TcwBfpEx_jzbr3zR4XcmNEBJfPWfiXO9/view?usp=drive_link">(https://doi.org/10.64898/2026.05.06.26352570)</a>.</li></p>.*
 *(This generates the chunked `.mtx` and `.diff` files, alongside `sites.txt` and `samples.txt` for the C++ engine to stream).*
 
 <br />
