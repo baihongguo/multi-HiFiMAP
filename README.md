@@ -59,15 +59,15 @@ Unlike standard HiFiMAP, multi-HiFiMAP operates directly on pre-computed phenoty
 
 <br />
 
-### Step 2: The C++ Engine
-The pipeline relies on a highly optimized C++ backend (`src/HiFiMAP_Stateful.cpp`). This script defines the `HiFiMAPCalculator` class, which uses the `Armadillo` linear algebra library to persist the sparse IBD matrix $X$ and the phenotype matrices in memory. It computes exact Hutchinson trace expansions on the fly. 
-
-You do not need to manually compile this file; the main R script automatically loads it via `sourceCpp()`.
+### Step 2: Run Parallelized multi-HiFiMAP Scan (Bash wrapper)
+To run the actual association scan efficiently across all chunks, use the provided Bash wrapper. The script automatically divides the chromosome's testing sites into chunks, queues the R jobs to prevent overloading your cluster, and merges the results.
 
 <br />
 
-### Step 3: Run Parallelized multi-HiFiMAP Scan (Bash wrapper)
-To run the actual association scan efficiently across all chunks, use the provided Bash wrapper. The script automatically divides the chromosome's testing sites into chunks, queues the R jobs to prevent overloading your cluster, and merges the results.
+##The C++ Engine
+The pipeline relies on a highly optimized C++ backend (`src/multi-HiFiMAP_helper.cpp`). This script defines the `HiFiMAPCalculator` class, which uses the `Armadillo` linear algebra library to persist the sparse IBD matrix $X$ and the phenotype matrices in memory. It computes exact Hutchinson trace expansions on the fly. 
+
+You do not need to manually compile this file; the main R script automatically loads it via `sourceCpp()`.
 
 Make sure the configuration paths inside `Run_multi_HiFiMAP_parallel.sh` point to your output directories and your input files:
 
