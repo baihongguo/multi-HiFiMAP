@@ -56,8 +56,8 @@ Unlike standard HiFiMAP, multi-HiFiMAP operates directly on pre-computed phenoty
 
 <br />
 
-### Step 2: The C++ Stateful Engine (Automatic)
-The pipeline relies on a highly optimized C++ backend (`src/multi-HiFiMAP_helper.cpp`). This script defines the `HiFiMAPCalculator` class, which uses the `Armadillo` linear algebra library to persist the sparse IBD matrix $X$ and the phenotype matrices in memory. It computes exact Hutchinson trace expansions on the fly. 
+## The C++ Engine
+The pipeline relies on a optimized C++ backend (`src/multi-HiFiMAP_helper.cpp`). This script defines the `HiFiMAPCalculator` class, which uses the `Armadillo` linear algebra library to persist the sparse IBD matrix $X$ and the phenotype matrices in memory. It computes exact Hutchinson trace expansions on the fly. 
 
 You do not need to manually compile this file; the main R script automatically loads it via `sourceCpp()`.
 
