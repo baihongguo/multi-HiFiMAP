@@ -4,13 +4,13 @@ multi-phenotype High-resolution fast identity-by-descent (IBD) mapping test
 Current version: 1.0.0
 
 ## Overview
-**multi-HiFiMAP** is an extension of the HiFiMAP architecture designed for highly scalable, multi-phenotype IBD mapping. It utilizes an RV-coefficient-based double-kernel association approach, engineered through sparse algebraic moment expansions and a Hutchinson trace estimator. By leveraging a stateful C++ backend (`RcppArmadillo`) and a fast-forward streaming algorithm, multi-HiFiMAP scales to biobank-sized cohorts across dozens of phenotypes simultaneously without holding massive dense matrices in memory.
+**multi-HiFiMAP** is an extension of the HiFiMAP architecture designed for multi-phenotype IBD mapping. It utilizes an RV-coefficient-based double-kernel association approach, engineered through sparse algebraic moment expansions and a Hutchinson trace estimator. By leveraging a stateful C++ backend (`RcppArmadillo`) and a fast-forward streaming algorithm, multi-HiFiMAP scales to biobank-sized cohorts across hundreds of phenotypes simultaneously without holding massive dense matrices in memory.
 
 ## Quick Installation 
 
 `multi-HiFiMAP` can be downloaded via:
 ```bash
-git clone [https://github.com/hanchenlab/multi-HiFiMAP](https://github.com/hanchenlab/multi-HiFiMAP)
+git clone [https://github.com/baihongguo/multi-HiFiMAP](https://github.com/baihongguo/multi-HiFiMAP)
 cd multi-HiFiMAP
 ```
 
@@ -57,7 +57,7 @@ Unlike standard HiFiMAP, multi-HiFiMAP operates directly on pre-computed phenoty
 <br />
 
 ### Step 2: The C++ Stateful Engine (Automatic)
-The pipeline relies on a highly optimized C++ backend (`src/HiFiMAP_Stateful.cpp`). This script defines the `HiFiMAPCalculator` class, which uses the `Armadillo` linear algebra library to persist the sparse IBD matrix $X$ and the phenotype matrices in memory. It computes exact Hutchinson trace expansions on the fly. 
+The pipeline relies on a highly optimized C++ backend (`src/multi-HiFiMAP_helper.cpp`). This script defines the `HiFiMAPCalculator` class, which uses the `Armadillo` linear algebra library to persist the sparse IBD matrix $X$ and the phenotype matrices in memory. It computes exact Hutchinson trace expansions on the fly. 
 
 You do not need to manually compile this file; the main R script automatically loads it via `sourceCpp()`.
 
@@ -173,7 +173,3 @@ chr     pos       n.ibd.segs    p.value
 21      14256336  1057          0.0065234
 ```
 
-## References
-<p>If you use multi-HiFiMAP, please cite
-<li>Guo, B. et al. HiFiMAP: High-resolution fast identity-by-descent mapping test. <em>medRxiv</em> 2026.05.06.26352570
-[<b>Preprint</b>]. May 17, 2026. DOI: <a href="https://www.medrxiv.org/content/10.64898/2026.05.06.26352570v1">(https://doi.org/10.64898/2026.05.06.26352570)</a>.</li></p>
