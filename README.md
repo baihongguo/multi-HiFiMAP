@@ -1,42 +1,49 @@
 # multi-HiFiMAP
-multi-phenotype High-resolution fast identity-by-descent (IBD) mapping test
-<br />
-Current version: 1.0.0
+Multi-phenotype high-resolution fast identity-by-descent (IBD) mapping test
+
+Current version: 1.1.0 ([version history](#version-history))
 
 ## Overview
-**multi-HiFiMAP** is an extension of the HiFiMAP architecture designed for multi-phenotype IBD mapping. It utilizes an RV-coefficient-based double-kernel association approach, engineered through sparse algebraic moment expansions and a Hutchinson trace estimator. By leveraging a stateful C++ backend (`RcppArmadillo`) and a fast-forward streaming algorithm, multi-HiFiMAP scales to biobank-sized cohorts across hundreds of phenotypes simultaneously without holding massive dense matrices in memory.
+**multi-HiFiMAP** tests whether local IBD sharing at a SNP is associated with many phenotypes jointly, at single-SNP testing resolution. It builds on [HiFiMAP](#citation), our single-phenotype IBD mapping test.
 
-## Quick Installation 
+The test statistic is the RV coefficient between the local IBD matrix and a phenotype kernel built from the scaled residuals of all phenotypes (the double-kernel association test, DKAT). P-values come from a Pearson type III approximation to the permutation distribution, matched on its first three moments, so no permutations are needed.
 
-`multi-HiFiMAP` can be downloaded via:
+Three algorithms make this feasible genome-wide in large samples:
+- **Sparse algebra:** every moment is computed from the non-zero elements of the local IBD matrix, so no dense *n* × *n* matrix is ever formed.
+- **Randomized traces:** the third-order trace is estimated with Hutchinson's estimator, using sparse matrix–vector products.
+- **Dynamic updating:** adjacent SNPs differ by a sparse change in the IBD matrix, so the moments are updated rather than recomputed.
+
+A stateful C++ backend (`RcppArmadillo`) keeps the sparse IBD matrix in memory as the scan moves along the chromosome.
+
+## Installation
 ```bash
-git clone [https://github.com/baihongguo/multi-HiFiMAP](https://github.com/baihongguo/multi-HiFiMAP)
+git clone https://github.com/baihongguo/multi-HiFiMAP.git
 cd multi-HiFiMAP
 ```
+There is no separate build step: the R script compiles the C++ backend with `Rcpp::sourceCpp()` when it starts. This needs a C++ compiler (e.g. `g++`).
 
-## Preparations
-The software is developed and tested in Linux environments. 
+## Requirements
+The software is developed and tested on Linux.
 
-**Python Dependencies (Python >= 3.6):**
-* `numpy`
+**Python (>= 3.6):** `numpy`
 
-**R Dependencies (R >= 4.0.0):**
-* `data.table`
-* `Matrix`
-* `Rcpp`
-* `RcppArmadillo`
-* `PearsonDS`
-* `MASS`
+**R (>= 4.0.0):** `data.table`, `Matrix`, `Rcpp`, `RcppArmadillo`, `PearsonDS`, `MASS`
+```r
+install.packages(c("data.table", "Matrix", "Rcpp", "RcppArmadillo", "PearsonDS", "MASS"))
+```
 
----
+## Repository layout
+```text
+example/                 toy data: 5,000 individuals, 128 phenotypes, chromosome 21
+src/hapIBD_parsing/      parsing_hapIBD.py: hap-ibd segments -> sparse checkpoints and per-SNP differences
+src/multi-HiFiMAP/       run_multi_HiFiMAP.R (scan of one chunk) and multi-HiFiMAP_helper.cpp (C++ backend)
+src/Shell script/        Run_multi-HiFiMAP_parallel.sh (runs all chunks in parallel and merges the results)
+```
 
-## Usage & Example Pipeline
+## Usage
+Run all commands from the repository root. The toy example uses the files in `example/`.
 
-Based on the repository structure, all test files are located in the `example/` directory, and all source codes are in the `src/` directory.
-
-### Step 0: Pre-parse the IBD Segments (Python)
-This step transforms the raw IBD segments into high-performance sparse matrices (`.mtx`) and differential updates (`.diff`). It automatically chunks the chromosome to allow for parallel processing.
-
+### Step 0: Parse the IBD segments (Python)
 ```bash
 python3 src/hapIBD_parsing/parsing_hapIBD.py \
     --ibd example/chr21_toy.ibd.gz \
@@ -44,167 +51,91 @@ python3 src/hapIBD_parsing/parsing_hapIBD.py \
     --output example/ibd_prep/chr21 \
     --n-checkpoints 20
 ```
-*chr21_toy.vcf.gz is available at : <a href="https://drive.google.com/file/d/1TcwBfpEx_jzbr3zR4XcmNEBJfPWfiXO9/view?usp=drive_link">(https://drive.google.com/file/d/1TcwBfpEx_jzbr3zR4XcmNEBJfPWfiXO9/view?usp=drive_link)</a>.</li></p>.*
-*(This generates the chunked `.mtx` and `.diff` files, alongside `sites.txt` and `samples.txt` for the C++ engine to stream).*
+- **`--ibd`** is the output of [hap-ibd](https://github.com/browning-lab/hap-ibd): plain or gzipped, with columns sample 1, haplotype 1, sample 2, haplotype 2, chromosome, start, end, length in cM. Run hap-ibd with the IBD length threshold you want to test (we use 1 cM).
+- **`--vcf`** gives the SNP positions and the sample order. The toy VCF is too large for GitHub: download [chr21_toy.vcf.gz](https://drive.google.com/file/d/1TcwBfpEx_jzbr3zR4XcmNEBJfPWfiXO9/view?usp=drive_link) and place it in `example/`.
+- **`--output`** should be one folder per chromosome. It receives the checkpoint matrices (`ibd_mat_<site>.mtx`), the per-SNP differences (`delta_<site>.diff`), `sites.txt` and `samples.txt`.
+- **`--n-checkpoints`** sets how many checkpoint matrices are written. Use the same number as `NUM_CHUNKS` in Step 2, so that each chunk starts close to a checkpoint.
+- **Optional:** `--mask` excludes regions (a BED file or `chr:start-end`), and `--resume` continues an interrupted run.
 
-<br />
+### Step 1: Prepare the phenotype files
+multi-HiFiMAP works directly on pre-computed phenotype residuals and their correlation matrix; no fitted null-model object is needed. Prepare three plain-text files without headers:
 
-### Step 1: Prepare Phenotype Residuals & Correlation Matrix
-Unlike standard HiFiMAP, multi-HiFiMAP operates directly on pre-computed phenotype residuals and their correlation matrix. You **do not** need to provide a fitted GLMM `.rds` object. You only need three plain text files:
+1. **Residuals (`toy_lmscaledresiduals.txt`):** an *N* × *K* matrix of scaled residuals for *N* individuals and *K* phenotypes, e.g. from a linear mixed model of each phenotype on its covariates. Residuals are mean-centered by construction.
+2. **Correlation matrix (`toy_cor_matrix.txt`):** the *K* × *K* correlation matrix of the residuals. It must be invertible, because the script uses its inverse.
+3. **Subject IDs (`toy_subject_ids.txt`):** one ID per line, in the row order of the residuals file. The IDs must match the sample IDs in the VCF (`samples.txt`).
 
-1.  **Residuals File (`toy_lmscaledresiduals.txt`):** An $N \times K$ matrix (no header, no row names) of scaled residuals for your $N$ individuals across $K$ phenotypes.
-2.  **Correlation Matrix (`toy_cor_matrix.txt`):** A $K \times K$ phenotypic correlation matrix.
-3.  **Subject IDs File (`toy_subject_ids.txt`):** A single-column text file containing the $N$ individual IDs in the exact row order of the Residuals File.
+The individuals in the residuals file can be a subset of the samples in the IBD data: the R script maps the IBD matrices to the IDs, in the given order. If the residual rows already follow `samples.txt` exactly, you can set the ID file to `NONE`.
 
-**Note on Sample Matching:** The subjects in your Residuals File can be a *subset* of the individuals present in the parsed IBD data (`samples.txt` inside your `ibd_prep` folder). The multi-HiFiMAP R script will automatically align and project the sparse IBD matrices down to match the exact subset and order of individuals provided in your Subject IDs file.
+### Step 2: Run the parallel scan
+Edit the configuration block at the top of `src/Shell script/Run_multi-HiFiMAP_parallel.sh`:
+- input and output paths (`IBD_BASE_DIR`, `RES_FILE`, `COR_FILE`, `ID_FILE`, `RESULT_DIR`, `LOG_DIR`);
+- `chromosomes` and `NUM_CHUNKS`, the number of chunks per chromosome;
+- `MAX_JOBS` and `MIN_JOBS`, which control how many chunks run at once. Set them from your cores and memory; see [Computational resources](#computational-resources).
 
-<br />
-
-### Step 2: Run Parallelized multi-HiFiMAP Scan (Bash wrapper)
-To run the actual association scan efficiently across all chunks, use the provided Bash wrapper. The script automatically divides the chromosome's testing sites into chunks, queues the R jobs to prevent overloading your cluster, and merges the results.
-
-<br />
-
-**The C++ Engine**
-The pipeline relies on a highly optimized C++ backend (`src/multi-HiFiMAP_helper.cpp`). This script defines the `HiFiMAPCalculator` class, which uses the `Armadillo` linear algebra library to persist the sparse IBD matrix $X$ and the phenotype matrices in memory. It computes exact Hutchinson trace expansions on the fly. 
-You do not need to manually compile this file; the main R script automatically loads it via `sourceCpp()`.
-
-Make sure the configuration paths inside `Run_multi_HiFiMAP_parallel.sh` point to your output directories and your input files:
+Then run:
 ```bash
-#!/bin/bash
+bash "src/Shell script/Run_multi-HiFiMAP_parallel.sh"
+```
+Each chunk runs `src/multi-HiFiMAP/run_multi_HiFiMAP.R` in the background. When all chunks finish, the script merges them into one file per chromosome. Logs go to `results/logs/`, and each chunk's main-loop run time is written to a `.time` file in `results/`.
 
-# ==========================================
-# CONFIGURATION
-# ==========================================
-R_SCRIPT="./src/multi_HiFiMAP.R"
-
-# DIRECTORIES
-IBD_BASE_DIR="./example/ibd_prep"
-RESULT_DIR="./results/UDIPs_results"
-LOG_DIR="./results/logs"
-
-# INPUT FILES
-RES_FILE="./example/toy_lmscaledresiduals.txt"
-COR_FILE="./example/toy_cor_matrix.txt"
-ID_FILE="./example/toy_subject_ids.txt" # Use "NONE" to default to samples.txt if no subsetting is needed
-
-mkdir -p "$LOG_DIR"
-mkdir -p "$RESULT_DIR"
-
-# Thread control to prevent cluster CPU throttling
-export OMP_NUM_THREADS=1
-export OPENBLAS_NUM_THREADS=1
-export MKL_NUM_THREADS=1
-export VECLIB_MAXIMUM_THREADS=1
-export NUMEXPR_NUM_THREADS=1
-
-# BATCH SETTINGS
-MAX_JOBS=60
-MIN_JOBS=60   
-chromosomes=(21)
-NUM_CHUNKS=20 # Split each chromosome into parallel chunks
-
-echo "=========================================================="
-echo "Launching Multi-Phenotype HiFiMAP (Chunked)"
-echo "Max Jobs: $MAX_JOBS \vert{} Min Jobs:$MIN_JOBS"
-echo "=========================================================="
-
-for chr in "${chromosomes[@]}"; do
-    
-    # 1. Determine total SNPs for this chromosome
-    IBD_DIR="${IBD_BASE_DIR}/chr${chr}"
-    SITES_FILE="${IBD_DIR}/sites.txt"
-    
-    if [ ! -f "$SITES_FILE" ]; then 
-        echo "Missing sites file for Chr $chr. Skipping."
-        continue
-    fi
-    
-    # Total lines minus the header
-    TOTAL_SNPS=$(wc -l < "$SITES_FILE")
-    ((TOTAL_SNPS--)) 
-    TOTAL_DIFFS=$((TOTAL_SNPS - 1))
-    
-    # Calculate chunk size (ceiling division)
-    CHUNK_SIZE=$(( (TOTAL_DIFFS + NUM_CHUNKS - 1) / NUM_CHUNKS ))
-
-    echo "========================================"
-    echo " Queuing Chr $chr | $TOTAL_SNPS SNPs into$NUM_CHUNKS Chunks"
-    echo "========================================"
-
-    for (( chunk=0; chunk<NUM_CHUNKS; # $END $START$TOTAL_DIFFS (( (chunk )) )); * + -gt -l) -p 1 1) 2. 3. CHUNK_SIZE Cap Define END="$TOTAL_DIFFS;" End Manage Queue START="$((" Start [ ]; and available break; chunk chunk++ diffs do end fi for if index indices running_jobs the then this to total wc |>= MAX_JOBS )); then
-            while (( running_jobs >= MIN_JOBS )); do
-                sleep 5
-                running_jobs=$(jobs -p | wc -l)
-            done
-        fi
-
-        # 4. Construct chunk-specific paths
-        log_file="${LOG_DIR}/chr${chr}_chunk${chunk}.log"
-        CHUNK_OUT="${RESULT_DIR}/Multi-HiFiMAP_chr${chr}_chunk${chunk}.txt"
-        
-        # 5. Launch the chunk
-        echo "  [LAUNCH] Chr $chr \vert{} Chunk$chunk (SNPs $START to$END)..."
-        nohup Rscript "$R_SCRIPT" \
-            "$chr" \
-            "$START" \
-            "$END" \
-            "$chunk" \
-            "$IBD_DIR" \
-            "$RES_FILE" \
-            "$COR_FILE" \
-            "$ID_FILE" \
-            "$CHUNK_OUT" > "$log_file" 2>&1 &
-        
-    done
-done
-
-echo "=========================================================="
-echo "All chromosomes divided and dispatched."
-echo "Waiting for the final background jobs to finish..."
-wait
-echo "All computational jobs finished! Moving to merge phase..."
-
-# ==========================================
-# MERGE PHASE
-# ==========================================
-echo "=========================================================="
-echo "Merging chunks into final chromosome files..."
-echo "=========================================================="
-
-for chr in "${chromosomes[@]}"; do
-    FINAL_FILE="${RESULT_DIR}/Multi-HiFiMAP_chr${chr}.txt"
-    
-    # Create or empty the final file so we don't accidentally append to an old run
-    > "$FINAL_FILE"
-    
-    echo "Merging Chr $chr..."
-    
-    for (( chunk=0; chunk<NUM_CHUNKS; "$CHUNK_FILE" )); -f CHUNK_FILE="${RESULT_DIR}/Multi-HiFiMAP_chr${chr}_chunk${chunk}.txt" [ ]; cat chunk++ do if then>> "$FINAL_FILE"
-            
-            # Auto-clean up intermediate chunk files after successful merge
-            rm "$CHUNK_FILE"
-        else
-            echo "  [WARNING] Missing chunk file: $CHUNK_FILE"
-        fi
-    done
-    
-    echo "  -> Saved to $FINAL_FILE"
-done
-
-echo "=========================================================="
-echo "Pipeline Complete!"
-echo "=========================================================="
+To run one chunk directly:
+```bash
+Rscript src/multi-HiFiMAP/run_multi_HiFiMAP.R <chr> <chunk_start> <chunk_end> <chunk_id> \
+    <ibd_dir> <residuals> <cor_matrix> <subject_ids or NONE> <output_file>
 ```
 
-### Final Output
-The final merged result file (`results/UDIPs_results/Multi-HiFiMAP_toy_chr21.txt`) will contain the exact multi-phenotype association statistics for every tested variant:
+### Output
+`results/Multi-HiFiMAP_chr21.txt` has one row per tested SNP:
 
-```text 
+```text
 chr     pos       n.ibd.segs    p.value
-21      14240779  1052          0.0047846   
-21      14242245  1054          0.0066947   
-21      14250602  1056          0.0067795   
+21      14240779  1052          0.0047846
+21      14242245  1054          0.0066947
+21      14250602  1056          0.0067795
 21      14256336  1057          0.0065234
 ```
+- **pos:** base-pair position (from `sites.txt`).
+- **n.ibd.segs:** number of IBD segments covering the SNP among the analyzed individuals.
+- **p.value:** multi-phenotype p-value, written with 7 significant digits.
 
+## Computational resources
+The cost at each SNP grows with the number of IBD-sharing pairs, not with *n*², because no dense *n* × *n* matrix is formed. It therefore rises with sample size and with shorter IBD segments.
+
+In the UK Biobank UDIP cohort (*N* ≈ 36,000; 128 phenotypes; 20 chunks per chromosome; one thread per job):
+
+| IBD threshold | CPU time per SNP | Genome-wide |
+|---|---|---|
+| 1 cM | about 16 s | 649,793 SNPs in 2,938 CPU hours |
+| 2 cM | about 2.6 s | 640,900 SNPs in 460 CPU hours |
+
+These times were measured with version 1.0.0; version 1.1.0 gives identical p-values and is slightly faster.
+
+Peak memory per chunk is typically 5–8 GiB. It reaches about 31 GiB in a few regions where IBD sharing is unusually dense. Plan `MAX_JOBS` around the largest chunks.
+
+We recommend one thread per job (the `OMP_NUM_THREADS=1` settings in the shell script) and parallelizing across chunks.
+
+## Version history
+**1.1.0** (October 2026)
+- **Lower memory.**
+  - The phenotype term *U*<sub>s</sub> = Σ<sub>ij</sub> *w*<sub>ij</sub><sup>3</sup> is now accumulated in blocks of 2,000 rows, so the dense *n* × *n* phenotype kernel *W* = *r*Σ<sup>−1</sup>*r*<sup>T</sup> (about 10 GB at *n* = 36,000, plus a temporary copy) is no longer formed.
+  - The C++ update no longer copies the IBD matrix at each SNP.
+  - In the UK Biobank UDIP analysis, typical peak memory per chunk fell from about 24 GiB to 5–8 GiB, and the maximum from about 47 GiB to about 31 GiB. The p-values are unchanged.
+- **Accurate very small p-values.** When the normal approximation is used (skewness below 10<sup>−6</sup>), the upper tail is now computed directly. The previous `1 - pnorm(Z)` returned exactly 0 for p-values below about 10<sup>−16</sup>.
+- **Corrected centering of three third-moment terms (*U*, *B*, *R*) of the IBD matrix.** In our UK Biobank tests, including chunks with the strongest signals, the p-values were unchanged at the reported precision.
+- **Fixed file paths.**
+  - The shell script now calls `src/multi-HiFiMAP/run_multi_HiFiMAP.R`.
+  - The R script loads `multi-HiFiMAP_helper.cpp` from its own folder, so it runs from any working directory.
+  - The example files are now named `toy_cor_matrix.txt` and `toy_subject_ids.txt`.
+
+**1.0.0**: initial release.
+
+## Citation
+If you use multi-HiFiMAP, please cite:
+- Guo B, Naseri A, Xie Z, Zhang M, Salehi Nasab S, Sarnowski C, Zhi D, Chen H. Multi-phenotype high-resolution fast identity-by-descent mapping test. Manuscript in preparation; presented at the ASHG 2026 Annual Meeting.
+- Guo B, et al. HiFiMAP: high-resolution fast identity-by-descent mapping test. *Am J Hum Genet*, in revision.
+
+## License
+GPL-2.0; see [LICENSE](LICENSE).
+
+## Questions and issues
+Please open an issue on this repository.
