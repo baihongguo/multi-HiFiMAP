@@ -1,3 +1,6 @@
+# multi-HiFiMAP version 1.1.0: multi-phenotype IBD mapping for one chunk of SNPs on one chromosome.
+# Usage (normally launched by src/Shell script/Run_multi-HiFiMAP_parallel.sh):
+#   Rscript run_multi_HiFiMAP.R <chr_num> <chunk_start> <chunk_end> <chunk_id> <ibd_dir> <res_file> <cor_file> <id_file> <out_file>
 Sys.setenv(MKL_NUM_THREADS = 1)
 library(Rcpp)
 library(PearsonDS)
@@ -6,8 +9,12 @@ library(Matrix)
 library(RcppArmadillo)
 library(MASS)
 
-# Load the optimized C++ stateful backend
-sourceCpp("src/HiFiMAP_Stateful.cpp")
+# Load the C++ backend from the folder that contains this script, so the script works from any working directory
+script_dir <- local({
+  f <- sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE))
+  if (length(f) == 1) dirname(normalizePath(f)) else getwd()
+})
+sourceCpp(file.path(script_dir, "multi-HiFiMAP_helper.cpp"))
 
 # -------------------------------------------------------------------------
 # 1. SETUP AND CHUNK ARGUMENTS
@@ -130,7 +137,8 @@ calculate_p_value <- function(stats, n, stats_precalc) {
   m3 <- as.numeric(skewness.rv)
   
   Z_stat <- (Tstat - mean.rv) / sqrt(variance.rv)
-  if (abs(m3) < 1e-6) return(1 - pnorm(Z_stat))
+  # upper tail computed directly: 1 - pnorm(Z) rounds to exactly 0 for Z > ~8.2 (p < ~1e-16)
+  if (abs(m3) < 1e-6) return(pnorm(Z_stat, lower.tail = FALSE))
   
   shape <- 4 / m3^2; scale <- m3 / 2; location <- -2 / m3      
   PIIIpars <- list(shape = shape, location = location, scale = scale)
@@ -165,9 +173,15 @@ rtr <- crossprod(r); M <- K %*% rtr; Ts <- sum(K * t(rtr)); T2s <- sum(M * t(M))
 rK <- r %*% K; diagW <- rowSums(rK * r); S2s <- sum(diagW^2); S3s <- sum(diagW^3)
 v <- crossprod(r, diagW); Bs <- crossprod(v, K %*% v); M2 <- M %*% K
 diagW2 <- rowSums((r %*% M2) * r); Rs <- sum(diagW * diagW2)
-T3s <- sum(diag(M %*% M %*% M)); W <- r%*% K %*% t(r); Us <- sum(W^3)
+T3s <- sum(diag(M %*% M %*% M))
+# Us = sum(W^3) with W = r K r' = rK r'. Accumulate over blocks of 2,000 rows so the dense n x n W
+# (about 10 GB, plus a second copy for W^3) is never formed; the result is the same up to rounding.
+tr_r <- t(r); Us <- 0
+for (b in split(seq_len(nrow(r)), ceiling(seq_len(nrow(r)) / 2000)))
+  Us <- Us + sum((rK[b, , drop = FALSE] %*% tr_r)^3)
+rm(tr_r)
 stats_precalc <- list(Ts=Ts, T2s=T2s, S2s=S2s, S3s=S3s, Us=Us, Rs=Rs, Bs=Bs, T3s=T3s)
-rm(W); gc()
+gc()
 
 sites <- fread(file.path(ibd_dir, "sites.txt"))
 samples_vcf <- fread(file.path(ibd_dir, "samples.txt"), header=F)$V1
