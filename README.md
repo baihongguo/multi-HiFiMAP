@@ -76,7 +76,7 @@ Then run:
 ```bash
 bash "src/Shell script/Run_multi-HiFiMAP_parallel.sh"
 ```
-Each chunk runs `src/multi-HiFiMAP/run_multi_HiFiMAP.R` in the background. When all chunks finish, the script merges them into one file per chromosome. Logs go to `results/logs/`, and each chunk's main-loop run time is written to a `.time` file in `results/`.
+Each chunk runs `src/multi-HiFiMAP/run_multi_HiFiMAP.R` in the background. When all chunks finish (around 5 minutes if you have 20 threads idle), the script merges them into one file per chromosome. Logs go to `results/logs/`, and each chunk's main-loop run time is written to a `.time` file in `results/`.
 
 To run one chunk directly:
 ```bash
