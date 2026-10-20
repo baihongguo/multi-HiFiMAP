@@ -51,7 +51,7 @@ python3 src/hapIBD_parsing/parsing_hapIBD.py \
     --output example/ibd_prep/chr21 \
     --n-checkpoints 20
 ```
-- **`--ibd`** is the output of [hap-ibd](https://github.com/browning-lab/hap-ibd): plain or gzipped, with columns sample 1, haplotype 1, sample 2, haplotype 2, chromosome, start, end, length in cM. Run hap-ibd with the IBD length threshold you want to test (we use 1 cM).
+- **`--ibd`** is the output of [hap-ibd](https://github.com/browning-lab/hap-ibd): plain or gzipped, with columns sample 1, haplotype 1, sample 2, haplotype 2, chromosome, start, end, length in cM. Run hap-ibd with the IBD length threshold you want to test (we use 1 cM). Its sample IDs must be the VCF sample IDs; the script stops with an error if none of them match.
 - **`--vcf`** gives the SNP positions and the sample order. The toy VCF is too large for GitHub: download [chr21_toy.vcf.gz](https://drive.google.com/file/d/1TcwBfpEx_jzbr3zR4XcmNEBJfPWfiXO9/view?usp=drive_link) and place it in `example/`.
 - **`--output`** should be one folder per chromosome. It receives the checkpoint matrices (`ibd_mat_<site>.mtx`), the per-SNP differences (`delta_<site>.diff`), `sites.txt` and `samples.txt`.
 - **`--n-checkpoints`** sets how many checkpoint matrices are written. Use the same number as `NUM_CHUNKS` in Step 2, so that each chunk starts close to a checkpoint.
@@ -60,11 +60,11 @@ python3 src/hapIBD_parsing/parsing_hapIBD.py \
 ### Step 1: Prepare the phenotype files
 multi-HiFiMAP works directly on pre-computed phenotype residuals and their correlation matrix; no fitted null-model object is needed. Prepare three plain-text files without headers:
 
-1. **Residuals (`toy_lmscaledresiduals.txt`):** an *N* × *K* matrix of scaled residuals for *N* individuals and *K* phenotypes, e.g. from a linear or linear mixed model of each phenotype on its covariates. Residuals are mean-centered by construction.
+1. **Residuals (`toy_lmscaledresiduals.txt`):** an *N* × *K* matrix of scaled residuals for *N* individuals and *K* phenotypes, e.g. from a linear mixed model of each phenotype on its covariates. Residuals are mean-centered by construction.
 2. **Correlation matrix (`toy_cor_matrix.txt`):** the *K* × *K* correlation matrix of the residuals. It must be invertible, because the script uses its inverse.
-3. **Subject IDs (`toy_subject_ids.txt`):** one ID per line, in the row order of the residuals file. The IDs must match the sample IDs in the VCF (`samples.txt`).
+3. **Subject IDs (`toy_subject_ids.txt`):** one ID per line, in the row order of the residuals file. Each ID must be one of the VCF sample IDs (listed in `samples.txt` after Step 0), with no duplicates.
 
-The individuals in the residuals file can be a subset of the samples in the IBD data: the R script maps the IBD matrices to the IDs, in the given order. If the residual rows already follow `samples.txt` exactly, you can set the ID file to `NONE`.
+The subject IDs can be any subset of the VCF samples, in any order. For example, you can parse the IBD segments once for the whole cohort and analyze only the individuals with phenotypes. The R script keeps the IBD sharing among the listed individuals only, in the order of the ID file. It stops with an error if an ID is not in `samples.txt`, if an ID is duplicated, or if the number of IDs differs from the number of residual rows. If the residual rows already follow `samples.txt` exactly, you can set the ID file to `NONE`.
 
 ### Step 2: Run the parallel scan
 Edit the configuration block at the top of `src/Shell script/Run_multi-HiFiMAP_parallel.sh`:
@@ -85,14 +85,14 @@ Rscript src/multi-HiFiMAP/run_multi_HiFiMAP.R <chr> <chunk_start> <chunk_end> <c
 ```
 
 ### Output
-`results/Multi-HiFiMAP_chr21.txt` has one row per tested SNP:
+`results/Multi-HiFiMAP_chr21.txt` has one row for each SNP where the IBD sharing changes; SNPs with the same IBD sharing as the previous SNP have the same result and are skipped. For the toy example, the first rows should be:
 
 ```text
 chr     pos       n.ibd.segs    p.value
-21      14240779  1052          0.0047846
-21      14242245  1054          0.0066947
-21      14250602  1056          0.0067795
-21      14256336  1057          0.0065234
+21      10865987  7465          0.09363319
+21      10870073  7467          0.0908351
+21      10870883  7472          0.08540655
+21      10872040  7473          0.086183
 ```
 - **pos:** base-pair position (from `sites.txt`).
 - **n.ibd.segs:** number of IBD segments covering the SNP among the analyzed individuals.
@@ -121,10 +121,14 @@ We recommend one thread per job (the `OMP_NUM_THREADS=1` settings in the shell s
   - The C++ update no longer copies the IBD matrix at each SNP.
   - In the UK Biobank UDIP analysis, typical peak memory per chunk fell from about 24 GiB to 5–8 GiB, and the maximum from about 47 GiB to about 31 GiB. The p-values are unchanged.
 - **Accurate very small p-values.** When the normal approximation is used (skewness below 10<sup>−6</sup>), the upper tail is now computed directly. The previous `1 - pnorm(Z)` returned exactly 0 for p-values below about 10<sup>−16</sup>.
+- **Corrected centering of three third-moment terms (*U*, *B*, *R*) of the IBD matrix.** In our UK Biobank tests, including chunks with the strongest signals, the p-values were unchanged at the reported precision.
 - **Fixed file paths.**
   - The shell script now calls `src/multi-HiFiMAP/run_multi_HiFiMAP.R`.
   - The R script loads `multi-HiFiMAP_helper.cpp` from its own folder, so it runs from any working directory.
   - The example files are now named `toy_cor_matrix.txt` and `toy_subject_ids.txt`.
+- **Toy example IDs fixed.** `chr21_toy.ibd.gz` and `toy_subject_ids.txt` now use the VCF sample IDs (`sim_0`, `sim_1`, ...). With the old numeric IDs, Step 0 matched no IBD record and wrote empty checkpoint matrices and no `.diff` files.
+- **`parsing_hapIBD.py` checks sample IDs.** It reports how many IBD records match the VCF samples and stops with an error if none do.
+- **`run_multi_HiFiMAP.R` checks subject IDs.** It reads IDs as text and stops with a clear message if an ID is missing from `samples.txt` or duplicated, or if the ID file does not exist. Previously, a missing file silently fell back to all VCF samples.
 
 **1.0.0**: initial release.
 
