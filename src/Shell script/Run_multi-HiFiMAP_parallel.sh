@@ -1,20 +1,26 @@
 #!/bin/bash
+# multi-HiFiMAP version 1.1.0: run the scan in parallel chunks and merge the results per chromosome.
+# Run from the repository root:  bash "src/Shell script/Run_multi-HiFiMAP_parallel.sh"
 
 # ==========================================
 # CONFIGURATION
 # ==========================================
-R_SCRIPT="./src/multi_HiFiMAP.R"
+R_SCRIPT="./src/multi-HiFiMAP/run_multi_HiFiMAP.R"
 
 # DIRECTORIES
-IBD_BASE_DIR="./example/ibd_prep"
+IBD_BASE_DIR="./example/ibd_prep"      # one sub-folder per chromosome (chr21, ...) from parsing_hapIBD.py
 RESULT_DIR="./results"
 LOG_DIR="./results/logs"
 
 # INPUT FILES
 RES_FILE="./example/toy_lmscaledresiduals.txt"
 COR_FILE="./example/toy_cor_matrix.txt"
-ID_FILE="NONE" # Set to specific path if supplying custom subject IDs, or "NONE" to default to samples.txt
+ID_FILE="./example/toy_subject_ids.txt" # IDs in the row order of RES_FILE, or "NONE" if the rows follow samples.txt
 
+if [ ! -f "$R_SCRIPT" ]; then
+    echo "Cannot find $R_SCRIPT: run this script from the repository root."
+    exit 1
+fi
 mkdir -p "$LOG_DIR"
 mkdir -p "$RESULT_DIR"
 
