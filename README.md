@@ -60,7 +60,7 @@ python3 src/hapIBD_parsing/parsing_hapIBD.py \
 ### Step 1: Prepare the phenotype files
 multi-HiFiMAP works directly on pre-computed phenotype residuals and their correlation matrix; no fitted null-model object is needed. Prepare three plain-text files without headers:
 
-1. **Residuals (`toy_lmscaledresiduals.txt`):** an *N* × *K* matrix of scaled residuals for *N* individuals and *K* phenotypes, e.g. from a linear mixed model of each phenotype on its covariates. Residuals are mean-centered by construction.
+1. **Residuals (`toy_lmscaledresiduals.txt`):** an *N* × *K* matrix of scaled residuals for *N* individuals and *K* phenotypes, e.g. from a linear or linear mixed model of each phenotype on its covariates. Residuals are mean-centered by construction.
 2. **Correlation matrix (`toy_cor_matrix.txt`):** the *K* × *K* correlation matrix of the residuals. It must be invertible, because the script uses its inverse.
 3. **Subject IDs (`toy_subject_ids.txt`):** one ID per line, in the row order of the residuals file. The IDs must match the sample IDs in the VCF (`samples.txt`).
 
