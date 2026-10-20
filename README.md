@@ -121,7 +121,6 @@ We recommend one thread per job (the `OMP_NUM_THREADS=1` settings in the shell s
   - The C++ update no longer copies the IBD matrix at each SNP.
   - In the UK Biobank UDIP analysis, typical peak memory per chunk fell from about 24 GiB to 5–8 GiB, and the maximum from about 47 GiB to about 31 GiB. The p-values are unchanged.
 - **Accurate very small p-values.** When the normal approximation is used (skewness below 10<sup>−6</sup>), the upper tail is now computed directly. The previous `1 - pnorm(Z)` returned exactly 0 for p-values below about 10<sup>−16</sup>.
-- **Corrected centering of three third-moment terms (*U*, *B*, *R*) of the IBD matrix.** In our UK Biobank tests, including chunks with the strongest signals, the p-values were unchanged at the reported precision.
 - **Fixed file paths.**
   - The shell script now calls `src/multi-HiFiMAP/run_multi_HiFiMAP.R`.
   - The R script loads `multi-HiFiMAP_helper.cpp` from its own folder, so it runs from any working directory.
