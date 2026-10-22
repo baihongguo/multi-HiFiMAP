@@ -121,7 +121,6 @@ We recommend one thread per job (the `OMP_NUM_THREADS=1` settings in the shell s
   - The C++ update no longer copies the IBD matrix at each SNP.
   - In the UK Biobank UDIP analysis, typical peak memory per chunk fell from about 24 GiB to 5–8 GiB, and the maximum from about 47 GiB to about 31 GiB.
 - **Accurate very small p-values.** When the normal approximation is used (skewness below 10<sup>−6</sup>), the upper tail is now computed directly. The previous `1 - pnorm(Z)` returned exactly 0 for p-values below about 10<sup>−16</sup>.
-- **Toy example IDs fixed.** `chr21_toy.ibd.gz` and `toy_subject_ids.txt` now use the VCF sample IDs (`sim_0`, `sim_1`, ...). With the old numeric IDs, Step 0 matched no IBD record and wrote empty checkpoint matrices and no `.diff` files.
 - **`parsing_hapIBD.py` checks sample IDs.** It reports how many IBD records match the VCF samples and stops with an error if none do.
 - **`run_multi_HiFiMAP.R` checks subject IDs.** It reads IDs as text and stops with a clear message if an ID is missing from `samples.txt` or duplicated, or if the ID file does not exist. Previously, a missing file silently fell back to all VCF samples.
 
