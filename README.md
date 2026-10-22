@@ -6,7 +6,7 @@ Current version: 1.1.0 ([version history](#version-history))
 ## Overview
 **multi-HiFiMAP** tests whether local IBD sharing at a SNP is associated with many phenotypes jointly, at single-SNP testing resolution. It builds on [HiFiMAP](#citation), our single-phenotype IBD mapping test.
 
-The test statistic is the RV coefficient between the local IBD matrix and a phenotype kernel built from the scaled residuals of all phenotypes (the double-kernel association test, DKAT). P-values come from a Pearson type III approximation to the permutation distribution, matched on its first three moments, so no permutations are needed.
+The test statistic is the RV coefficient between the local IBD matrix and a phenotype kernel built from the scaled residuals of all phenotypes. P-values come from a Pearson type III approximation to the permutation distribution, matched on its first three moments, so no permutations are needed.
 
 Three algorithms make this feasible genome-wide in large samples:
 - **Sparse algebra:** every moment is computed from the non-zero elements of the local IBD matrix, so no dense *n* × *n* matrix is ever formed.
