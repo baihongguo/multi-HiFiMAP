@@ -51,7 +51,7 @@ python3 src/hapIBD_parsing/parsing_hapIBD.py \
     --output example/ibd_prep/chr21 \
     --n-checkpoints 20
 ```
-- **`--ibd`** is the output of [hap-ibd](https://github.com/browning-lab/hap-ibd): plain or gzipped, with columns sample 1, haplotype 1, sample 2, haplotype 2, chromosome, start, end, length in cM. Run hap-ibd with the IBD length threshold you want to test (we use 1 cM). Its sample IDs must be the VCF sample IDs; the script stops with an error if none of them match.
+- **`--ibd`** is the output of [hap-ibd](https://github.com/browning-lab/hap-ibd): plain or gzipped, with columns sample 1, haplotype 1, sample 2, haplotype 2, chromosome, start, end, length in cM. Run hap-ibd with the IBD length threshold you want to test. Its sample IDs must be the VCF sample IDs; the script stops with an error if none of them match.
 - **`--vcf`** gives the SNP positions and the sample order. The toy VCF is too large for GitHub: download [chr21_toy.vcf.gz](https://drive.google.com/file/d/1TcwBfpEx_jzbr3zR4XcmNEBJfPWfiXO9/view?usp=drive_link) and place it in `example/`.
 - **`--output`** should be one folder per chromosome. It receives the checkpoint matrices (`ibd_mat_<site>.mtx`), the per-SNP differences (`delta_<site>.diff`), `sites.txt` and `samples.txt`.
 - **`--n-checkpoints`** sets how many checkpoint matrices are written. Use the same number as `NUM_CHUNKS` in Step 2, so that each chunk starts close to a checkpoint.
