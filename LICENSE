@@ -672,3 +672,44 @@ may consider it more useful to permit linking proprietary applications with
 the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <https://www.gnu.org/licenses/why-not-lgpl.html>.
+
+======================================================================
+
+multi-HiFiMAP: Multi-phenotype high-resolution fast identity-by-descent mapping test
+Copyright (C) 2026  Bohong Guo, Han Chen
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
+Code shared with HiFiMAP
+========================
+
+src/hapIBD_parsing/parsing_hapIBD.py
+    The IBD parser from HiFiMAP <https://github.com/hanchenlab/HiFiMAP>.
+    Copyright (C) 2025-2026  Bohong Guo, Han Chen.
+    Licensed under the GNU General Public License, version 3 or later.
+
+
+Third-party code included in multi-HiFiMAP
+==========================================
+
+src/multi-HiFiMAP/run_multi_HiFiMAP.R
+    calculate_p_value() is adapted from inner.KRV() in the MiRKAT R package
+    <https://CRAN.R-project.org/package=MiRKAT> (file R/KRV_helper.R;
+    authors Haotian Zheng, Xiang Zhan and Ni Zhao). The moment terms it
+    uses follow the same definitions.
+    Copyright (C) the MiRKAT authors.
+    Licensed under the GNU General Public License, version 2 or later.
+    Method: Zhan X, Plantinga A, Zhao N, Wu MC. Biometrics (2017),
+    doi:10.1111/biom.12684.
