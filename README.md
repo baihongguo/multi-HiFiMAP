@@ -132,7 +132,7 @@ If you use multi-HiFiMAP, please cite:
 - Guo B, et al. HiFiMAP: high-resolution fast identity-by-descent mapping test. ([preprint](https://www.medrxiv.org/content/10.64898/2026.05.06.26352570v1)) *Am J Hum Genet*, in revision.
 
 ## License
-GPL-2.0; see [LICENSE](LICENSE).
+GPL-3.0 or later; see [LICENSE](LICENSE).
 
 ## Questions and issues
 Please open an issue on this repository.
